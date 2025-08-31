@@ -39,6 +39,37 @@ using namespace std::chrono;
 
 const uint64_t DEFAULT_UPPER_LIMIT = 10'000'000LLU;
 
+// Tiny A/B switches (override with -DUSE_xxx=1)
+#ifndef USE_PREFETCH
+#define USE_PREFETCH 0
+#endif
+#ifndef USE_BRANCH_HINTS
+#define USE_BRANCH_HINTS 0
+#endif
+#ifndef USE_ALWAYS_INLINE
+#define USE_ALWAYS_INLINE 0
+#endif
+
+#if USE_BRANCH_HINTS && (defined(__GNUC__) || defined(__clang__))
+#  define LIKELY(x)   (__builtin_expect(!!(x), 1))
+#  define UNLIKELY(x) (__builtin_expect(!!(x), 0))
+#else
+#  define LIKELY(x)   (x)
+#  define UNLIKELY(x) (x)
+#endif
+
+#if USE_PREFETCH && (defined(__GNUC__) || defined(__clang__))
+#  define PREFETCH_W(p) __builtin_prefetch((p), 1, 1)
+#else
+#  define PREFETCH_W(p) (void)0
+#endif
+
+#if USE_ALWAYS_INLINE && (defined(__GNUC__) || defined(__clang__))
+#  define ATTR_ALWAYS_INLINE __attribute__((always_inline))
+#else
+#  define ATTR_ALWAYS_INLINE
+#endif
+
 class BitArray 
 {
     uint8_t *array;
@@ -74,11 +105,15 @@ public:
         std::memset(array, 0x00, byteSize);
     }
 
-    ~BitArray() {
-        if (allocatedWithMalloc) free(array); else delete[] array;
+    ~BitArray() 
+    {
+        if (allocatedWithMalloc) 
+            free(array); 
+        else 
+            delete[] array;
     }
 
-    constexpr bool get(size_t n) const 
+    constexpr bool get(size_t n) const ATTR_ALWAYS_INLINE
     {
         if (n % 2 == 0)
             return false; // Even numbers > 2 are not prime
@@ -86,25 +121,25 @@ public:
         return !(array[index(n)] & (uint8_t(1) << (n % 8)));
     }
 
-    void set(size_t n)
+    void set(size_t n) ATTR_ALWAYS_INLINE
     {
         n = n / 2; // Map the actual number to the index in the array
         array[index(n)] |= (uint8_t(1) << (n % 8));
     }
 
-    constexpr size_t size() const 
+    constexpr size_t size() const ATTR_ALWAYS_INLINE
     {
         return logicalSize;
     }
 
     // Fast get when n is known odd and already in bit-domain index (bi)
-    inline bool getOddByBitIndex(size_t bi) const 
+    inline bool getOddByBitIndex(size_t bi) const ATTR_ALWAYS_INLINE
     {
         return (array[bi >> 3] & (uint8_t(1) << (bi & 7))) == 0;
     }
 
     // Find next zero bit (prime) at or after startBi, up to and including maxBi; returns maxBi+1 if none
-    size_t find_next_prime_bit(size_t startBi, size_t maxBi) const 
+    size_t find_next_prime_bit(size_t startBi, size_t maxBi) const ATTR_ALWAYS_INLINE
     {
         if (startBi > maxBi) 
             return maxBi + 1;
@@ -158,10 +193,14 @@ public:
             return;
 
         // For large steps, a simple scalar loop over exact hits is cheaper than touching every 64-bit word.
-        if (bitStep >= BITSTEP_WORDWISE_THRESHOLD) 
+        if (UNLIKELY(bitStep >= BITSTEP_WORDWISE_THRESHOLD)) 
         {
             for (uint64_t bi = b; bi < bitCount; bi += bitStep) 
+            {
                 array[bi >> 3] |= static_cast<uint8_t>(1) << (bi & 7);
+                // Prefetch a future store location to help with long strides
+                PREFETCH_W(&array[((bi + (bitStep << 3)) >> 3)]);
+            }
             return;
         }
 
