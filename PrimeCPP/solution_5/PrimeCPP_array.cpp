@@ -1,6 +1,7 @@
 // ---------------------------------------------------------------------------
 // PrimeCPP.cpp : Davepl's updated version of Dave's Garage Prime Sieve
 //                solution_2, but with optimized mark multiples on ARM
+//                Contest-compliant version (discovers all primes algorithmically)
 //                Developed w/ assistance of ChatGPT-5 on Aug-31-2025
 // ---------------------------------------------------------------------------
 
@@ -377,27 +378,9 @@ class prime_sieve
           const uint64_t q = (uint64_t) sqrt((double)limit);
           const size_t qBi = q / 2;
           
-          // Manually handle the smallest primes for maximum efficiency
-          // These primes mark many multiples and benefit from specialized handling
-          
-          // Prime 3: Mark every 3rd odd number starting from 9
-          if (q >= 3) {
-              Bits.mark_multiples(9, 3);
-          }
-          
-          // Prime 5: Mark every 5th odd number starting from 25  
-          if (q >= 5) {
-              Bits.mark_multiples(25, 5);
-          }
-          
-          // Prime 7: Mark every 7th odd number starting from 49
-          if (q >= 7) {
-              Bits.mark_multiples(49, 7);
-          }
-          
-          // For remaining primes, use optimized scanning starting from 11
-          uint64_t factor = 11;
-          size_t bi = factor / 2;  // 11 -> 5
+          // Start with the first odd prime and discover all primes algorithmically
+          uint64_t factor = 3;
+          size_t bi = factor / 2;  // 3 -> 1
 
           while (factor <= q)
           {
