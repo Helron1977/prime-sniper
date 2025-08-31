@@ -23,10 +23,11 @@
 // No platform-specific headers; keep this file portable
 
 // Threshold in bit-domain step (factor) at/above which we prefer the simple scalar marking loop.
-// Tune by defining -DBITSTEP_WORDWISE_THRESHOLD=<value> at compile time.
+// Tune by defining -DBITSTEP_WORDWISE_THRESHOLD=<value> at compile time.  I tested all values and
+// this was the best result on ARM M2 Mac
+
 #ifndef BITSTEP_WORDWISE_THRESHOLD
-// Default word-wise threshold; tune via -DBITSTEP_WORDWISE_THRESHOLD=<value>
-#define BITSTEP_WORDWISE_THRESHOLD 10
+   #define BITSTEP_WORDWISE_THRESHOLD 10
 #endif
 
 using namespace std;
@@ -40,7 +41,7 @@ const uint64_t DEFAULT_UPPER_LIMIT = 10'000'000LLU;
 #ifndef USE_ALWAYS_INLINE
 #define USE_ALWAYS_INLINE 1
 #endif
-
+./
 #if USE_BRANCH_HINTS && (defined(__GNUC__) || defined(__clang__))
 #  define LIKELY(x)   (__builtin_expect(!!(x), 1))
 #  define UNLIKELY(x) (__builtin_expect(!!(x), 0))
