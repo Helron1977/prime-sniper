@@ -172,7 +172,9 @@ public:
     void mark_multiples(uint64_t start, uint64_t factor)
     {
         // Map to bit domain (only odds stored): bitIdx = n/2, bitStep = step
-        if (start < 3) start = 3; // safety, though callers use factor*factor
+        if (start < 3) 
+            start = 3; // safety, though callers use factor*factor
+        
         const uint64_t bitCount = (logicalSize + 1) / 2; // number of bits stored
         uint64_t b = start / 2;           // starting bit index
         const uint64_t bitStep = factor;  // step in bit domain
@@ -188,7 +190,8 @@ public:
             const uint64_t end = (bitCount >= step8) ? (bitCount - step8) : 0;
             
             // Process 8 at a time with aggressive prefetching
-            while (bi < end) {
+            while (bi < end) 
+            {
                 // Store 8 values
                 array[bi >> 3] |= static_cast<uint8_t>(1) << (bi & 7);
                 bi += bitStep;
@@ -209,7 +212,8 @@ public:
             }
             
             // Handle remaining values
-            while (bi < bitCount) {
+            while (bi < bitCount) 
+            {
                 array[bi >> 3] |= static_cast<uint8_t>(1) << (bi & 7);
                 bi += bitStep;
             }
