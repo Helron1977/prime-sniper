@@ -186,14 +186,43 @@ public:
         if (bitStep == 0 || b >= bitCount)
             return;
 
-        // For large steps, a simple scalar loop over exact hits is cheaper than touching every 64-bit word.
+        // For large steps, use optimized scalar loop with aggressive prefetching
         if (UNLIKELY(bitStep >= BITSTEP_WORDWISE_THRESHOLD)) 
         {
-            for (uint64_t bi = b; bi < bitCount; bi += bitStep) 
-            {
+            // Unroll by 8 to reduce loop overhead and improve instruction-level parallelism
+            uint64_t bi = b;
+            const uint64_t step8 = bitStep * 8;
+            const uint64_t end = (bitCount >= step8) ? (bitCount - step8) : 0;
+            
+            // Process 8 at a time with aggressive prefetching
+            while (bi < end) {
+                // Store 8 values
                 array[bi >> 3] |= static_cast<uint8_t>(1) << (bi & 7);
-                // Prefetch a future store location to help with long strides
-                PREFETCH_W(&array[((bi + (bitStep << 3)) >> 3)]);
+                bi += bitStep;
+                array[bi >> 3] |= static_cast<uint8_t>(1) << (bi & 7);
+                bi += bitStep;
+                array[bi >> 3] |= static_cast<uint8_t>(1) << (bi & 7);
+                bi += bitStep;
+                array[bi >> 3] |= static_cast<uint8_t>(1) << (bi & 7);
+                bi += bitStep;
+                array[bi >> 3] |= static_cast<uint8_t>(1) << (bi & 7);
+                bi += bitStep;
+                array[bi >> 3] |= static_cast<uint8_t>(1) << (bi & 7);
+                bi += bitStep;
+                array[bi >> 3] |= static_cast<uint8_t>(1) << (bi & 7);
+                bi += bitStep;
+                array[bi >> 3] |= static_cast<uint8_t>(1) << (bi & 7);
+                bi += bitStep;
+                
+                // Prefetch multiple cache lines ahead
+                PREFETCH_W(&array[((bi + step8) >> 3)]);
+                PREFETCH_W(&array[((bi + step8 * 2) >> 3)]);
+            }
+            
+            // Handle remaining values
+            while (bi < bitCount) {
+                array[bi >> 3] |= static_cast<uint8_t>(1) << (bi & 7);
+                bi += bitStep;
             }
             return;
         }
@@ -211,40 +240,73 @@ public:
         const uint32_t advance = static_cast<uint32_t>(delta == 0 ? 0 : (bitStep - delta));
         uint32_t firstMod = static_cast<uint32_t>(b % bitStep); // first position modulo bitStep (kept in [0,bitStep))
 
-        // Precompute masks for this bitStep for each possible starting position inside a 64-bit word
-        // This avoids re-running the inner (pos += bitStep) loop for every word
-        uint64_t stepMasks[64]; // bitStep is small on ARM per threshold; cap at 64
+        // Enhanced mask precomputation with unrolled inner loops
+        uint64_t stepMasks[64];
         for (uint64_t first = 0; first < bitStep && first < 64; ++first) 
         {
             uint64_t m = 0ULL;
-            for (uint64_t pos = first; pos < 64; pos += bitStep)
+            // Unroll inner loop by 4 for better performance
+            uint64_t pos = first;
+            while (pos < 64 - bitStep * 3) {
                 m |= (1ULL << pos);
+                pos += bitStep;
+                m |= (1ULL << pos);
+                pos += bitStep;
+                m |= (1ULL << pos);
+                pos += bitStep;
+                m |= (1ULL << pos);
+                pos += bitStep;
+            }
+            // Handle remaining positions
+            while (pos < 64) {
+                m |= (1ULL << pos);
+                pos += bitStep;
+            }
             stepMasks[first] = m;
         }
 
-        // Helper to compute and apply a mask for one 64-bit word at index i
-        auto apply_mask_to_word = [&](size_t i, uint32_t firstAbsPos, uint32_t firstModLocal) 
-        {
-            uint64_t mask = stepMasks[firstModLocal];
-            if (i == startWordIndex && firstAbsPos) 
-                mask &= ~((1ULL << firstAbsPos) - 1ULL);
+        // Optimized word processing with bulk updates
+        uint64_t* words = reinterpret_cast<uint64_t*>(array);
+        
+        // Process multiple words at once when possible
+        while (wordIndex + 3 < fullWordCount) {
+            // Process 4 words at a time for better memory throughput
+            const uint32_t absPos = (wordIndex == startWordIndex) ? startPosAbs : 0u;
+            
+            uint64_t mask = stepMasks[firstMod];
+            if (wordIndex == startWordIndex && absPos) 
+                mask &= ~((1ULL << absPos) - 1ULL);
 
-            // Note: Using a conservative single-word update to preserve correctness across platforms.
-            // Fallback: single 64-bit word
-            reinterpret_cast<uint64_t*>(array)[i] |= mask;
-            return static_cast<size_t>(1);
-        };
-
-        // Iterate full words (portable single-word path)
+            words[wordIndex] |= mask;
+            
+            // Compute masks for next 3 words
+            uint32_t mod1 = firstMod + advance; if (mod1 >= bitStep) mod1 -= bitStep;
+            uint32_t mod2 = mod1 + advance; if (mod2 >= bitStep) mod2 -= bitStep;
+            uint32_t mod3 = mod2 + advance; if (mod3 >= bitStep) mod3 -= bitStep;
+            
+            words[wordIndex + 1] |= stepMasks[mod1];
+            words[wordIndex + 2] |= stepMasks[mod2];
+            words[wordIndex + 3] |= stepMasks[mod3];
+            
+            wordIndex += 4;
+            firstMod = mod3 + advance;
+            if (firstMod >= bitStep) firstMod -= bitStep;
+        }
+        
+        // Handle remaining words one by one
         while (wordIndex < fullWordCount) {
             const uint32_t absPos = (wordIndex == startWordIndex) ? startPosAbs : 0u;
-            size_t advanced = apply_mask_to_word(wordIndex, absPos, firstMod);
-            wordIndex += advanced;
-            if (advanced == 1) {
-                if (advance) {
-                    firstMod += advance;
-                    if (firstMod >= bitStep) firstMod -= bitStep;
-                }
+            
+            uint64_t mask = stepMasks[firstMod];
+            if (wordIndex == startWordIndex && absPos) 
+                mask &= ~((1ULL << absPos) - 1ULL);
+
+            words[wordIndex] |= mask;
+            
+            wordIndex++;
+            if (advance) {
+                firstMod += advance;
+                if (firstMod >= bitStep) firstMod -= bitStep;
             }
         }
 
@@ -323,12 +385,31 @@ class prime_sieve
 
       void runSieve()
       {
-          uint64_t factor = 3;
-          const uint64_t q = (uint64_t) sqrt((double)Bits.size());
-
-          // Work in bit domain for scanning primes: bi = n/2
-          size_t bi = factor / 2;               // 3 -> 1
-          const size_t qBi = q / 2;             // floor(q/2)
+          const uint64_t limit = Bits.size();
+          const uint64_t q = (uint64_t) sqrt((double)limit);
+          const size_t qBi = q / 2;
+          
+          // Manually handle the smallest primes for maximum efficiency
+          // These primes mark many multiples and benefit from specialized handling
+          
+          // Prime 3: Mark every 3rd odd number starting from 9
+          if (q >= 3) {
+              Bits.mark_multiples(9, 3);
+          }
+          
+          // Prime 5: Mark every 5th odd number starting from 25  
+          if (q >= 5) {
+              Bits.mark_multiples(25, 5);
+          }
+          
+          // Prime 7: Mark every 7th odd number starting from 49
+          if (q >= 7) {
+              Bits.mark_multiples(49, 7);
+          }
+          
+          // For remaining primes, use optimized scanning starting from 11
+          uint64_t factor = 11;
+          size_t bi = factor / 2;  // 11 -> 5
 
           while (factor <= q)
           {
@@ -337,11 +418,11 @@ class prime_sieve
               if (nextBi > qBi) break;
               factor = (uint64_t)(nextBi * 2 + 1);
 
-              // Mark multiples of the prime number as not prime
+              // Mark multiples starting from factor^2
               uint64_t start = factor * factor;
               Bits.mark_multiples(start, factor);
 
-              bi = nextBi + 1; // continue searching after this factor
+              bi = nextBi + 1;
           }
       }
 
