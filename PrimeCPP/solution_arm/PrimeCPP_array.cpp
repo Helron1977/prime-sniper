@@ -160,8 +160,10 @@ public:
         // Process full 64-bit words starting from the word containing the first bit
         size_t wordIndex = b / 64;
         const size_t startWordIndex = wordIndex;
-        uint64_t bit_in_word = b % 64;                // first position to mark within current word
+        const uint32_t startPosAbs = static_cast<uint32_t>(b % 64); // first position to mark within start word
         const uint64_t delta = 64 % bitStep;          // (pos + 64) % bitStep
+        const uint32_t advance = static_cast<uint32_t>(delta == 0 ? 0 : (bitStep - delta));
+        uint32_t firstMod = static_cast<uint32_t>(b % bitStep); // first position modulo bitStep (kept in [0,bitStep))
 
         // Precompute masks for this bitStep for each possible starting position inside a 64-bit word
         // This avoids re-running the inner (pos += bitStep) loop for every word
@@ -174,11 +176,11 @@ public:
         }
 
         // Helper to compute and apply a mask for one 64-bit word at index i
-        auto apply_mask_to_word = [&](size_t i, uint64_t firstPos) 
+        auto apply_mask_to_word = [&](size_t i, uint32_t firstAbsPos, uint32_t firstModLocal) 
         {
-            uint64_t mask = stepMasks[firstPos % bitStep];
-            if (i == startWordIndex && firstPos) {
-                mask &= ~((1ULL << firstPos) - 1ULL);
+            uint64_t mask = stepMasks[firstModLocal];
+            if (i == startWordIndex && firstAbsPos) {
+                mask &= ~((1ULL << firstAbsPos) - 1ULL);
             }
 
             // Note: Using a conservative single-word update to preserve correctness across platforms.
@@ -189,27 +191,51 @@ public:
 
         // Iterate full words
         while (wordIndex < fullWordCount) {
-            size_t advanced = apply_mask_to_word(wordIndex, bit_in_word);
+            const uint32_t absPos = (wordIndex == startWordIndex) ? startPosAbs : 0u;
+            size_t advanced = apply_mask_to_word(wordIndex, absPos, firstMod);
             wordIndex += advanced;
             if (advanced == 1) {
-                // advance first position for next word: (pos - 64) mod bitStep
-                bit_in_word = (delta == 0) ? bit_in_word : (bit_in_word + bitStep - delta) % bitStep;
+                // advance modulo-free for next word
+                if (advance) {
+                    firstMod += advance;
+                    if (firstMod >= bitStep) firstMod -= bitStep;
+                }
             }
         }
 
         // Process tail bytes (if any) with a compact scalar loop in bit domain
         if (tailBytes > 0) {
-            const uint64_t tailBitStart = static_cast<uint64_t>(fullWordCount) * 64ULL;
-            uint64_t firstBi;
-            if (b >= tailBitStart) {
-                firstBi = b;
-            } else {
-                const uint64_t diff = tailBitStart - b;
-                const uint64_t rem = diff % bitStep;
-                firstBi = (rem == 0) ? tailBitStart : (tailBitStart + (bitStep - rem));
-            }
-            for (uint64_t bi = firstBi; bi < bitCount; bi += bitStep) {
-                array[bi >> 3] |= static_cast<uint8_t>(1) << (bi & 7);
+            const uint64_t tailBitStart = static_cast<uint64_t>(fullWordCount) * 64ULL; // first bit index of tail word
+            const uint64_t lastWordBits = bitCount - tailBitStart; // number of valid bits in tail word (1..63)
+            if (lastWordBits) {
+                uint32_t tailFirstAbs = 0u;
+                uint32_t tailFirstMod = 0u;
+                if (b >= tailBitStart) {
+                    // We start inside the tail word
+                    tailFirstAbs = static_cast<uint32_t>(b - tailBitStart);
+                    tailFirstMod = static_cast<uint32_t>(b % bitStep);
+                } else {
+                    // We progressed through full words; current firstMod targets the tail word
+                    tailFirstAbs = 0u; // no need to clamp below 0
+                    tailFirstMod = firstMod;
+                }
+
+                uint64_t mask = stepMasks[tailFirstMod];
+                if (b >= tailBitStart && tailFirstAbs) {
+                    mask &= ~((1ULL << tailFirstAbs) - 1ULL);
+                }
+                // Clamp to the actual number of valid bits in the final partial word
+                if (lastWordBits < 64) {
+                    mask &= ((1ULL << lastWordBits) - 1ULL);
+                }
+
+                // Byte-safe OR into the tail bytes
+                uint8_t* tailPtr = array + fullWordCount * sizeof(uint64_t);
+                uint64_t m = mask;
+                for (size_t j = 0; j < tailBytes; ++j) {
+                    tailPtr[j] |= static_cast<uint8_t>(m & 0xFFu);
+                    m >>= 8;
+                }
             }
         }
     }
