@@ -33,15 +33,11 @@ using namespace std::chrono;
 
 const uint64_t DEFAULT_UPPER_LIMIT = 10'000'000LLU;
 
-// Tiny A/B switches (override with -DUSE_xxx=1)
-#ifndef USE_PREFETCH
-#define USE_PREFETCH 0
-#endif
 #ifndef USE_BRANCH_HINTS
-#define USE_BRANCH_HINTS 0
+#define USE_BRANCH_HINTS 1
 #endif
 #ifndef USE_ALWAYS_INLINE
-#define USE_ALWAYS_INLINE 0
+#define USE_ALWAYS_INLINE 1
 #endif
 
 #if USE_BRANCH_HINTS && (defined(__GNUC__) || defined(__clang__))
@@ -52,11 +48,6 @@ const uint64_t DEFAULT_UPPER_LIMIT = 10'000'000LLU;
 #  define UNLIKELY(x) (x)
 #endif
 
-#if USE_PREFETCH && (defined(__GNUC__) || defined(__clang__))
-#  define PREFETCH_W(p) __builtin_prefetch((p), 1, 1)
-#else
-#  define PREFETCH_W(p) (void)0
-#endif
 
 #if USE_ALWAYS_INLINE && (defined(__GNUC__) || defined(__clang__))
 #  define ATTR_ALWAYS_INLINE __attribute__((always_inline))
@@ -213,10 +204,6 @@ public:
                 bi += bitStep;
                 array[bi >> 3] |= static_cast<uint8_t>(1) << (bi & 7);
                 bi += bitStep;
-                
-                // Prefetch multiple cache lines ahead
-                PREFETCH_W(&array[((bi + step8) >> 3)]);
-                PREFETCH_W(&array[((bi + step8 * 2) >> 3)]);
             }
             
             // Handle remaining values
@@ -294,7 +281,8 @@ public:
         }
         
         // Handle remaining words one by one
-        while (wordIndex < fullWordCount) {
+        while (wordIndex < fullWordCount) 
+        {
             const uint32_t absPos = (wordIndex == startWordIndex) ? startPosAbs : 0u;
             
             uint64_t mask = stepMasks[firstMod];
