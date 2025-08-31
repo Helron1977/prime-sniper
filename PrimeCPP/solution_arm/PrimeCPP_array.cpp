@@ -1,7 +1,7 @@
 // ---------------------------------------------------------------------------
 // PrimeCPP.cpp : Davepl's updated version of Dave's Garage Prime Sieve
 //                solution_2, but with optimized mark multiples on ARM
-//                Developed w/ assistance of ChatGPT-5 on Aud-31-2025
+//                Developed w/ assistance of ChatGPT-5 on Aug-31-2025
 // ---------------------------------------------------------------------------
 
 #include <chrono>
@@ -106,7 +106,9 @@ public:
     // Find next zero bit (prime) at or after startBi, up to and including maxBi; returns maxBi+1 if none
     size_t find_next_prime_bit(size_t startBi, size_t maxBi) const 
     {
-        if (startBi > maxBi) return maxBi + 1;
+        if (startBi > maxBi) 
+            return maxBi + 1;
+
         const uint64_t* words = reinterpret_cast<const uint64_t*>(array);
         size_t wordIdx = startBi >> 6; // /64
         size_t bitOff = startBi & 63;
@@ -115,18 +117,26 @@ public:
         uint64_t inv;
         if (wordIdx <= lastWord) 
         {
+            // Check for zero bits in the current word
             uint64_t w = words[wordIdx];
             inv = ~w;
             if (bitOff)
                 inv &= ~((1ULL << bitOff) - 1ULL);
+
+            // Find the next word with a zero bit
             while (inv == 0ULL) 
             {
                 if (++wordIdx > lastWord) return maxBi + 1;
                 inv = ~words[wordIdx];
             }
+            // Find the first zero bit in the current word
             unsigned tz = __builtin_ctzll(inv);
+
             size_t bi = (wordIdx << 6) + tz;
-            if (bi <= maxBi) return bi;
+
+            // Check if the found bit index is within the allowed range
+            if (bi <= maxBi) 
+                return bi;
         }
         return maxBi + 1;
     }
@@ -151,9 +161,7 @@ public:
         if (bitStep >= BITSTEP_WORDWISE_THRESHOLD) 
         {
             for (uint64_t bi = b; bi < bitCount; bi += bitStep) 
-            {
                 array[bi >> 3] |= static_cast<uint8_t>(1) << (bi & 7);
-            }
             return;
         }
 
@@ -232,16 +240,20 @@ public:
                     tailFirstMod = firstMod;
                 }
 
+                // Compute the mask for the tail word
                 uint64_t mask = stepMasks[tailFirstMod];
                 if (b >= tailBitStart && tailFirstAbs) 
                     mask &= ~((1ULL << tailFirstAbs) - 1ULL);
+
                 // Clamp to the actual number of valid bits in the final partial word
                 if (lastWordBits < 64) 
                     mask &= ((1ULL << lastWordBits) - 1ULL);
 
-                // Byte-safe OR into the tail bytes
+                // Byte-safe OR to make the mask for the tail bytes
                 uint8_t* tailPtr = array + fullWordCount * sizeof(uint64_t);
                 uint64_t m = mask;
+
+                // Apply the mask to the tail bytes
                 for (size_t j = 0; j < tailBytes; ++j) 
                 {
                     tailPtr[j] |= static_cast<uint8_t>(m & 0xFFu);
