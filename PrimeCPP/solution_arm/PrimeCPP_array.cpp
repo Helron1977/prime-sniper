@@ -1,6 +1,6 @@
 // ---------------------------------------------------------------------------
 // PrimeCPP.cpp : Davepl's updated version of Dave's Garage Prime Sieve
-//                solution_2, but with optimized mark multiples
+//                solution_2, but with optimized mark multiples on ARM
 // ---------------------------------------------------------------------------
 
 #include <chrono>
@@ -16,6 +16,8 @@
 #include <vector>
 #include <thread>
 #include <memory>
+#include <cstdlib>
+
 #if defined(__aarch64__) || defined(__ARM_NEON)
 #include <arm_neon.h>
 #endif
@@ -36,9 +38,12 @@ using namespace std::chrono;
 
 const uint64_t DEFAULT_UPPER_LIMIT = 10'000'000LLU;
 
-class BitArray {
+class BitArray 
+{
     uint8_t *array;
     size_t logicalSize;
+    size_t byteSize;
+    bool allocatedWithMalloc {false};
 
     static constexpr size_t arraySize(size_t size) 
     {
@@ -53,12 +58,24 @@ class BitArray {
 public:
     explicit BitArray(size_t size) : logicalSize(size)
     {
-        auto arrSize = (size + 1) / 2; // Only store bits for odd numbers
-        array = new uint8_t[arraySize(arrSize)];
-        std::memset(array, 0x00, arraySize(arrSize));
+        auto arrBits = (size + 1) / 2; // Only store bits for odd numbers
+        byteSize = arraySize(arrBits);
+        // Align to 64 bytes to help wide loads/stores on ARM
+        void* ptr = nullptr;
+        if (posix_memalign(&ptr, 64, byteSize) != 0 || ptr == nullptr) {
+            // Fallback to unaligned new if alignment fails
+            array = new uint8_t[byteSize];
+            allocatedWithMalloc = false;
+        } else {
+            array = reinterpret_cast<uint8_t*>(ptr);
+            allocatedWithMalloc = true;
+        }
+        std::memset(array, 0x00, byteSize);
     }
 
-    ~BitArray() { delete[] array; }
+    ~BitArray() {
+        if (allocatedWithMalloc) free(array); else delete[] array;
+    }
 
     constexpr bool get(size_t n) const 
     {
@@ -77,6 +94,36 @@ public:
     constexpr size_t size() const 
     {
         return logicalSize;
+    }
+
+    // Fast get when n is known odd and already in bit-domain index (bi)
+    inline bool getOddByBitIndex(size_t bi) const {
+        return (array[bi >> 3] & (uint8_t(1) << (bi & 7))) == 0;
+    }
+
+    // Find next zero bit (prime) at or after startBi, up to and including maxBi; returns maxBi+1 if none
+    size_t find_next_prime_bit(size_t startBi, size_t maxBi) const {
+        if (startBi > maxBi) return maxBi + 1;
+        const uint64_t* words = reinterpret_cast<const uint64_t*>(array);
+        size_t wordIdx = startBi >> 6; // /64
+        size_t bitOff = startBi & 63;
+        const size_t lastWord = maxBi >> 6;
+
+        uint64_t inv;
+        if (wordIdx <= lastWord) {
+            uint64_t w = words[wordIdx];
+            inv = ~w;
+            if (bitOff)
+                inv &= ~((1ULL << bitOff) - 1ULL);
+            while (inv == 0ULL) {
+                if (++wordIdx > lastWord) return maxBi + 1;
+                inv = ~words[wordIdx];
+            }
+            unsigned tz = __builtin_ctzll(inv);
+            size_t bi = (wordIdx << 6) + tz;
+            if (bi <= maxBi) return bi;
+        }
+        return maxBi + 1;
     }
 
     // mark_multiples
@@ -106,41 +153,35 @@ public:
         }
 
         // Byte and word geometry
-        const size_t totalBytes = arraySize(bitCount);
+        const size_t totalBytes = byteSize;
         const size_t fullWordCount = totalBytes / sizeof(uint64_t); // number of complete 64-bit words
         const size_t tailBytes = totalBytes - fullWordCount * sizeof(uint64_t);
 
         // Process full 64-bit words starting from the word containing the first bit
         size_t wordIndex = b / 64;
+        const size_t startWordIndex = wordIndex;
         uint64_t bit_in_word = b % 64;                // first position to mark within current word
         const uint64_t delta = 64 % bitStep;          // (pos + 64) % bitStep
 
+        // Precompute masks for this bitStep for each possible starting position inside a 64-bit word
+        // This avoids re-running the inner (pos += bitStep) loop for every word
+        uint64_t stepMasks[64]; // bitStep is small on ARM per threshold; cap at 64
+        for (uint64_t first = 0; first < bitStep && first < 64; ++first) {
+            uint64_t m = 0ULL;
+            for (uint64_t pos = first; pos < 64; pos += bitStep)
+                m |= (1ULL << pos);
+            stepMasks[first] = m;
+        }
+
         // Helper to compute and apply a mask for one 64-bit word at index i
-        auto apply_mask_to_word = [&](size_t i, uint64_t firstPos) {
-            uint64_t mask = 0ULL;
-            for (uint64_t pos = firstPos; pos < 64; pos += bitStep)
-                mask |= (1ULL << pos);
+        auto apply_mask_to_word = [&](size_t i, uint64_t firstPos) 
+        {
+            uint64_t mask = stepMasks[firstPos % bitStep];
+            if (i == startWordIndex && firstPos) {
+                mask &= ~((1ULL << firstPos) - 1ULL);
+            }
 
-            #if defined(__aarch64__) || defined(__ARM_NEON)
-                // On Apple Silicon / ARM64, OR two words at a time when possible
-                if (i + 1 < fullWordCount) {
-                    // Compute next word's first position: (firstPos - 64) mod bitStep
-                    uint64_t next_first = (delta == 0) ? firstPos : (firstPos + bitStep - delta) % bitStep;
-                    uint64_t mask2 = 0ULL;
-                    for (uint64_t pos = next_first; pos < 64; pos += bitStep)
-                        mask2 |= (1ULL << pos);
-
-                    uint64x2_t data = vld1q_u64(reinterpret_cast<const uint64_t*>(array) + i);
-                    uint64x2_t masks = vsetq_lane_u64(mask, vdupq_n_u64(0ULL), 0);
-                    masks = vsetq_lane_u64(mask2, masks, 1);
-                    data = vorrq_u64(data, masks);
-                    vst1q_u64(reinterpret_cast<uint64_t*>(array) + i, data);
-
-                    // Advance caller's state by two words
-                    bit_in_word = (delta == 0) ? next_first : (next_first + bitStep - delta) % bitStep;
-                    return static_cast<size_t>(2);
-                }
-            #endif
+            // Note: Using a conservative single-word update to preserve correctness across platforms.
             // Fallback: single 64-bit word
             reinterpret_cast<uint64_t*>(array)[i] |= mask;
             return static_cast<size_t>(1);
@@ -204,25 +245,24 @@ class prime_sieve
       void runSieve()
       {
           uint64_t factor = 3;
-          uint64_t q = (int) sqrt(Bits.size());
+          const uint64_t q = (uint64_t) sqrt((double)Bits.size());
+
+          // Work in bit domain for scanning primes: bi = n/2
+          size_t bi = factor / 2;               // 3 -> 1
+          const size_t qBi = q / 2;             // floor(q/2)
 
           while (factor <= q)
           {
-              // Find the next prime number
-              for (; factor <= q; factor += 2)
-              {
-                  if (Bits.get(factor))
-                  {
-                      break;
-                  }
-              }
+              // Find the next prime by scanning for next zero bit
+              size_t nextBi = Bits.find_next_prime_bit(bi, qBi);
+              if (nextBi > qBi) break;
+              factor = (uint64_t)(nextBi * 2 + 1);
 
               // Mark multiples of the prime number as not prime
-              // Optimized word-wise marking to reduce per-bit work and memory traffic
               uint64_t start = factor * factor;
-              Bits.mark_multiples(start, factor * 1ULL);
+              Bits.mark_multiples(start, factor);
 
-              factor += 2;            
+              bi = nextBi + 1; // continue searching after this factor
           }
       }
 
@@ -408,7 +448,7 @@ int main(int argc, char **argv)
 
     if (!bQuiet)
     {
-        cout << "Primes Benchmark (c) 2021 Dave's Garage - http://github.com/davepl/primes" << endl;
+        cout << "Primes Benchmark (c) 2025 Dave's Garage - http://github.com/davepl/primes" << endl;
         cout << "-------------------------------------------------------------------------" << endl;
     }
 
