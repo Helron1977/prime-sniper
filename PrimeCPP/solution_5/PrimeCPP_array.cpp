@@ -19,19 +19,13 @@
 #include <memory>
 #include <cstdlib>
 
-#if defined(__aarch64__) || defined(__ARM_NEON)
-#include <arm_neon.h>
-#endif
+// No platform-specific headers; keep this file portable
 
 // Threshold in bit-domain step (factor) at/above which we prefer the simple scalar marking loop.
 // Tune by defining -DBITSTEP_WORDWISE_THRESHOLD=<value> at compile time.
 #ifndef BITSTEP_WORDWISE_THRESHOLD
-    #if defined(__aarch64__) || defined(__ARM_NEON)
-        // On Apple Silicon/ARM, a lower threshold performs better per measurements.
-        #define BITSTEP_WORDWISE_THRESHOLD 10
-    #else
-        #define BITSTEP_WORDWISE_THRESHOLD 64
-    #endif
+// Default word-wise threshold; tune via -DBITSTEP_WORDWISE_THRESHOLD=<value>
+#define BITSTEP_WORDWISE_THRESHOLD 10
 #endif
 
 using namespace std;
@@ -241,16 +235,13 @@ public:
             return static_cast<size_t>(1);
         };
 
-        // Iterate full words
+        // Iterate full words (portable single-word path)
         while (wordIndex < fullWordCount) {
             const uint32_t absPos = (wordIndex == startWordIndex) ? startPosAbs : 0u;
             size_t advanced = apply_mask_to_word(wordIndex, absPos, firstMod);
             wordIndex += advanced;
-            if (advanced == 1) 
-            {
-                // advance modulo-free for next word
-                if (advance) 
-                {
+            if (advanced == 1) {
+                if (advance) {
                     firstMod += advance;
                     if (firstMod >= bitStep) firstMod -= bitStep;
                 }
