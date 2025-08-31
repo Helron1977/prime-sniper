@@ -1,6 +1,7 @@
 // ---------------------------------------------------------------------------
 // PrimeCPP.cpp : Davepl's updated version of Dave's Garage Prime Sieve
 //                solution_2, but with optimized mark multiples on ARM
+//                Developed w/ assistance of ChatGPT-5 on Aud-31-2025
 // ---------------------------------------------------------------------------
 
 #include <chrono>
