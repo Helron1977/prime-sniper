@@ -41,7 +41,7 @@ const uint64_t DEFAULT_UPPER_LIMIT = 10'000'000LLU;
 #ifndef USE_ALWAYS_INLINE
 #define USE_ALWAYS_INLINE 1
 #endif
-./
+
 #if USE_BRANCH_HINTS && (defined(__GNUC__) || defined(__clang__))
 #  define LIKELY(x)   (__builtin_expect(!!(x), 1))
 #  define UNLIKELY(x) (__builtin_expect(!!(x), 0))
