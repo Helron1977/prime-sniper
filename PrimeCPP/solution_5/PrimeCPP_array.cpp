@@ -148,7 +148,8 @@ public:
             // Find the next word with a zero bit
             while (inv == 0ULL)
             {
-                if (++wordIdx > lastWord) return maxBi + 1;
+                if (++wordIdx > lastWord) 
+                    return maxBi + 1;
                 inv = ~words[wordIdx];
             }
             // Find the first zero bit in the current word
@@ -273,7 +274,9 @@ public:
             words[wordIndex] |= mask;
 
             // Compute masks for next 3 words
-            uint32_t mod1 = firstMod + advance; if (mod1 >= bitStep) mod1 -= bitStep;
+            uint32_t mod1 = firstMod + advance; 
+            if (mod1 >= bitStep) 
+                mod1 -= bitStep;
             uint32_t mod2 = mod1 + advance; if (mod2 >= bitStep) mod2 -= bitStep;
             uint32_t mod3 = mod2 + advance; if (mod3 >= bitStep) mod3 -= bitStep;
 
@@ -299,9 +302,11 @@ public:
             words[wordIndex] |= mask;
 
             wordIndex++;
-            if (advance) {
+            if (advance) 
+            {
                 firstMod += advance;
-                if (firstMod >= bitStep) firstMod -= bitStep;
+                if (firstMod >= bitStep) 
+                    firstMod -= bitStep;
             }
         }
 
