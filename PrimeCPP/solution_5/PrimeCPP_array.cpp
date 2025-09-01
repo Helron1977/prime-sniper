@@ -172,10 +172,6 @@ public:
 
     void mark_multiples(uint64_t start, uint64_t factor)
     {
-        // Map to bit domain (only odds stored): bitIdx = n/2, bitStep = step
-        if (start < 3)
-            start = 3; // safety, though callers use factor*factor
-
         const uint64_t bitCount = (logicalSize + 1) / 2; // number of bits stored
         uint64_t b = start / 2;           // starting bit index
         const uint64_t bitStep = factor;  // step in bit domain
@@ -592,8 +588,8 @@ int main(int argc, char **argv)
 
     if (!bQuiet)
     {
-        cout << "Primes Benchmark (c) 2025 Dave's Garage - http://github.com/davepl/primes" << endl;
-        cout << "-------------------------------------------------------------------------" << endl;
+        cout << "Primes Benchmark (c) 2025 Dave's Garage - https://github.com/davepl/primes" << endl;
+        cout << "--------------------------------------------------------------------------" << endl;
     }
 
     if (bOneshot)
@@ -635,6 +631,7 @@ int main(int argc, char **argv)
         std::vector<std::thread> threads(cThreads);
         std::vector<uint64_t> l_passes(cThreads);
         for (unsigned int i = 0; i < cThreads; i++)
+        {
             threads[i] = std::thread([i, &l_passes, &tStart](size_t llUpperLimit)
             {
                 l_passes[i] = 0;
@@ -643,14 +640,15 @@ int main(int argc, char **argv)
                     ++l_passes[i];
                 }
             }, llUpperLimit);
-        for (auto i = 0; i < cThreads; i++) {
+        }
+        for (auto i = 0; i < cThreads; i++) 
+        {
             threads[i].join();
             cPasses += l_passes[i];
         }
         auto tEnd = steady_clock::now() - tStart;
         duration = duration_cast<microseconds>(tEnd).count()/1000000.0;
     }
-
 
     if (bOneshot)
     {
