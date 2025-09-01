@@ -503,8 +503,10 @@ class prime_sieve
 //
 // Like atoll(), but accepts K, M, G, and T as magnitude suffixes.
 
-long long custom_atoll(const std::string& value_str) {
-    static const std::unordered_map<char, long long> suffixes = {
+long long custom_atoll(const std::string& value_str) 
+{
+    static const std::unordered_map<char, long long> suffixes = 
+    {
         {'K', 1000LL},
         {'M', 1000000LL},
         {'G', 1000000000LL},
@@ -512,27 +514,25 @@ long long custom_atoll(const std::string& value_str) {
     };
 
     std::string input_str = value_str;
-    for (char& c : input_str) {
+    for (char& c : input_str) 
         c = std::toupper(c);
-    }
 
     char last_char = input_str.back();
-    if (suffixes.find(last_char) != suffixes.end()) {
+    if (suffixes.find(last_char) != suffixes.end()) 
+    {
         long long multiplier = suffixes.at(last_char);
         std::string numeric_part = input_str.substr(0, input_str.size() - 1);
         std::istringstream iss(numeric_part);
         double numeric_value;
-        if (!(iss >> numeric_value)) {
+        if (!(iss >> numeric_value)) 
             throw std::invalid_argument("Invalid numeric part: " + numeric_part);
-        }
         return static_cast<long long>(numeric_value * multiplier);
     }
 
     std::istringstream iss(input_str);
     long long result;
-    if (!(iss >> result)) {
+    if (!(iss >> result)) 
         throw std::invalid_argument("Invalid input format");
-    }
     return result;
 }
 
@@ -550,8 +550,9 @@ int main(int argc, char **argv)
 
     for (auto i = args.begin(); i != args.end(); ++i)
     {
-        if (*i == "-h" || *i == "--help") {
-              cout << "Syntax: " << argv[0] << " [-t,--threads threads] [-s,--seconds seconds] [-l,--limit limit] [-1,--oneshot] [-q,--quiet] [-h] " << endl;
+        if (*i == "-h" || *i == "--help") 
+        {
+            cout << "Syntax: " << argv[0] << " [-t,--threads threads] [-s,--seconds seconds] [-l,--limit limit] [-1,--oneshot] [-q,--quiet] [-h] " << endl;
             return 0;
         }
         else if (*i == "-t" || *i == "--threads")
@@ -623,14 +624,14 @@ int main(int argc, char **argv)
 
     if (bOneshot)
     {
-        auto tStart       = steady_clock::now();
+        auto tStart = steady_clock::now();
         prime_sieve(llUpperLimit).runSieve();
         auto tEnd = steady_clock::now() - tStart;
         duration = duration_cast<microseconds>(tEnd).count()/1000000.0;
     }
     else
     {
-        auto tStart       = steady_clock::now();
+        auto tStart = steady_clock::now();
         std::vector<std::thread> threads(cThreads);
         std::vector<uint64_t> l_passes(cThreads);
         for (unsigned int i = 0; i < cThreads; i++)
