@@ -10,7 +10,7 @@ SRC="PrimeCPP_array.cpp"
 BIN="primes_array.exe"
 
 echo "Compiling $SRC -> $BIN"
-clang++ -march=native -mtune=native -pthread -O3 -ffast-math -fno-math-errno -fno-trapping-math -flto -std=c++17 "$SRC" -o "$BIN"
+clang++ -mtune=native -pthread -O3 -ffast-math -fno-math-errno -fno-trapping-math -flto -std=c++17 "$SRC" -o "$BIN"
 
 echo "Running $BIN"
 "./$BIN"
