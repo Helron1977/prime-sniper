@@ -9,10 +9,10 @@ RUN clang++ -march=native -mtune=native -pthread -Ofast -std=c++17 PrimeCPP_arra
 
 FROM ubuntu:22.04
 
-COPY --from=build /opt/app/primes_array.exe /opt/app/primes_mask.exe /opt/app/
+COPY --from=build /opt/app/primes_array.exe /opt/app/
 
 WORKDIR /opt/app
 COPY benchmark.sh .
 
 ENTRYPOINT [ "./benchmark.sh"]
-CMD ["both", "-l", "1000000" ]
+CMD ["dummy", "-l", "1000000" ]
