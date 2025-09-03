@@ -33,7 +33,7 @@
 using namespace std;
 using namespace std::chrono;
 
-const uint64_t DEFAULT_UPPER_LIMIT = 10'000'000LLU;
+const uint64_t DEFAULT_UPPER_LIMIT = 1'000'000LLU;
 
 #ifndef USE_BRANCH_HINTS
 #define USE_BRANCH_HINTS 1
@@ -148,7 +148,7 @@ public:
             // Find the next word with a zero bit
             while (inv == 0ULL)
             {
-                if (++wordIdx > lastWord) 
+                if (++wordIdx > lastWord)
                     return maxBi + 1;
                 inv = ~words[wordIdx];
             }
@@ -270,8 +270,8 @@ public:
             words[wordIndex] |= mask;
 
             // Compute masks for next 3 words
-            uint32_t mod1 = firstMod + advance; 
-            if (mod1 >= bitStep) 
+            uint32_t mod1 = firstMod + advance;
+            if (mod1 >= bitStep)
                 mod1 -= bitStep;
             uint32_t mod2 = mod1 + advance; if (mod2 >= bitStep) mod2 -= bitStep;
             uint32_t mod3 = mod2 + advance; if (mod3 >= bitStep) mod3 -= bitStep;
@@ -298,10 +298,10 @@ public:
             words[wordIndex] |= mask;
 
             wordIndex++;
-            if (advance) 
+            if (advance)
             {
                 firstMod += advance;
-                if (firstMod >= bitStep) 
+                if (firstMod >= bitStep)
                     firstMod -= bitStep;
             }
         }
@@ -499,9 +499,9 @@ class prime_sieve
 //
 // Like atoll(), but accepts K, M, G, and T as magnitude suffixes.
 
-long long custom_atoll(const std::string& value_str) 
+long long custom_atoll(const std::string& value_str)
 {
-    static const std::unordered_map<char, long long> suffixes = 
+    static const std::unordered_map<char, long long> suffixes =
     {
         {'K', 1000LL},
         {'M', 1000000LL},
@@ -510,24 +510,24 @@ long long custom_atoll(const std::string& value_str)
     };
 
     std::string input_str = value_str;
-    for (char& c : input_str) 
+    for (char& c : input_str)
         c = std::toupper(c);
 
     char last_char = input_str.back();
-    if (suffixes.find(last_char) != suffixes.end()) 
+    if (suffixes.find(last_char) != suffixes.end())
     {
         long long multiplier = suffixes.at(last_char);
         std::string numeric_part = input_str.substr(0, input_str.size() - 1);
         std::istringstream iss(numeric_part);
         double numeric_value;
-        if (!(iss >> numeric_value)) 
+        if (!(iss >> numeric_value))
             throw std::invalid_argument("Invalid numeric part: " + numeric_part);
         return static_cast<long long>(numeric_value * multiplier);
     }
 
     std::istringstream iss(input_str);
     long long result;
-    if (!(iss >> result)) 
+    if (!(iss >> result))
         throw std::invalid_argument("Invalid input format");
     return result;
 }
@@ -546,7 +546,7 @@ int main(int argc, char **argv)
 
     for (auto i = args.begin(); i != args.end(); ++i)
     {
-        if (*i == "-h" || *i == "--help") 
+        if (*i == "-h" || *i == "--help")
         {
             cout << "Syntax: " << argv[0] << " [-t,--threads threads] [-s,--seconds seconds] [-l,--limit limit] [-1,--oneshot] [-q,--quiet] [-h] " << endl;
             return 0;
@@ -641,7 +641,7 @@ int main(int argc, char **argv)
                 }
             }, llUpperLimit);
         }
-        for (auto i = 0; i < cThreads; i++) 
+        for (auto i = 0; i < cThreads; i++)
         {
             threads[i].join();
             cPasses += l_passes[i];
