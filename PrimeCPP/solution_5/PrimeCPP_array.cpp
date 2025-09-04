@@ -463,7 +463,7 @@ class prime_sieve
       void printResults(bool showResults, double duration, size_t passes, size_t threads) const
       {
           if (showResults)
-              cout << "2, ";
+              cerr << "2, ";
 
           size_t count = (Bits.size() >= 2); // Count 2 as prime if in range
           for (uint64_t num = 3; num <= Bits.size(); num += 2)
@@ -471,15 +471,15 @@ class prime_sieve
               if (Bits.get(num))
               {
                   if (showResults)
-                      cout << num << ", ";
+                      cerr << num << ", ";
                   count++;
               }
           }
 
           if (showResults)
-              cout << "\n";
+              cerr << "\n";
 
-          cout << "Passes: "  << passes << ", "
+          cerr << "Passes: "  << passes << ", "
                << "Threads: " << threads << ", "
                << "Time: "    << duration << ", "
                << "Average: " << duration/passes << ", "
@@ -489,8 +489,8 @@ class prime_sieve
                << "\n";
 
           // Following 2 lines added by rbergen to conform to drag race output format
-          cout << "\n";
-          cout << "davepl_array;" << passes << ";" << duration << ";" << threads << ";algorithm=base,faithful=yes,bits=1\n";
+          cerr << "\n";
+          cout << "davepl_array_optimized;" << passes << ";" << duration << ";" << threads << ";algorithm=base,faithful=yes,bits=1\n";
       }
 
 };
@@ -588,16 +588,16 @@ int main(int argc, char **argv)
 
     if (!bQuiet)
     {
-        cout << "Primes Benchmark (c) 2025 Dave's Garage - https://github.com/davepl/primes" << endl;
-        cout << "--------------------------------------------------------------------------" << endl;
+        cerr << "Primes Benchmark (c) 2025 Dave's Garage - https://github.com/davepl/primes" << endl;
+        cerr << "--------------------------------------------------------------------------" << endl;
     }
 
     if (bOneshot)
-        cout << "Oneshot is on. A single pass will be used to simulate a 5 second run." << endl;
+        cerr << "Oneshot is on. A single pass will be used to simulate a 5 second run." << endl;
 
     if (bOneshot && (cSecondsRequested > 0 || cThreadsRequested > 1))
     {
-        cout << "Oneshot option cannot be mixed with second count or thread count." << endl;
+        cerr << "Oneshot option cannot be mixed with second count or thread count." << endl;
         return 0;
     }
 
@@ -608,7 +608,7 @@ int main(int argc, char **argv)
 
     if (!bQuiet)
     {
-        printf("Computing primes to %llu on %d thread%s for %d second%s.\n",
+        fprintf(stderr, "Computing primes to %llu on %d thread%s for %d second%s.\n",
             (unsigned long long)llUpperLimit,
             cThreads,
             cThreads == 1 ? "" : "s",
@@ -663,7 +663,7 @@ int main(int argc, char **argv)
     if (!bQuiet)
         checkSieve.printResults(bPrintPrimes, duration , cPasses, cThreads);
     else
-        cout << cPasses << ", " << duration / cPasses << endl;
+        cerr << cPasses << ", " << duration / cPasses << endl;
 
     // On success return the count of primes found; on failure, return 0
 
