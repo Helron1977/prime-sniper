@@ -1,6 +1,6 @@
 {
     "name": "prime-sniper",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "description": "Générateur ultra-rapide de nombres premiers JS/Node. Utilise le Tir Direct (Wheel Factorization) et l'Asynchrone Multithread pour pulvériser les limites V8.",
     "main": "index.js",
     "scripts": {
@@ -20,14 +20,14 @@
         "worker-threads",
         "numbers"
     ],
-    "author": "Math Innovator",
+    "author": "helron",
     "license": "MIT",
     "engines": {
         "node": ">=14.0.0"
     },
     "repository": {
         "type": "git",
-        "url": "git+https://github.com/votre-nom/prime-sniper.git"
+        "url": "git+https://github.com/Helron1977/prime-sniper.git"
     },
     "devDependencies": {
         "@algorithm.ts/sieve-prime": "^2.0.14",
