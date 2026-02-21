@@ -1,0 +1,38 @@
+{
+    "name": "prime-sniper",
+    "version": "1.0.0",
+    "description": "Générateur ultra-rapide de nombres premiers JS/Node. Utilise le Tir Direct (Wheel Factorization) et l'Asynchrone Multithread pour pulvériser les limites V8.",
+    "main": "index.js",
+    "scripts": {
+        "test": "echo \"Error: no test specified\" && exit 1",
+        "bench": "node --expose-gc benchmarks/benchmark.js",
+        "bench:multi": "node --expose-gc benchmarks/test_multi.js"
+    },
+    "keywords": [
+        "primes",
+        "math",
+        "sieve",
+        "eratosthenes",
+        "wheel-factorization",
+        "prime-generator",
+        "fast",
+        "multithread",
+        "worker-threads",
+        "numbers"
+    ],
+    "author": "Math Innovator",
+    "license": "MIT",
+    "engines": {
+        "node": ">=14.0.0"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/votre-nom/prime-sniper.git"
+    },
+    "devDependencies": {
+        "@algorithm.ts/sieve-prime": "^2.0.14",
+        "primes-and-factors": "^1.3.3",
+        "primesieve": "^0.2.1",
+        "sieve-of-eratosthenes": "^0.0.3"
+    }
+}
