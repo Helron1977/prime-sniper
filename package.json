@@ -1,6 +1,6 @@
 {
     "name": "prime-sniper",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "description": "Générateur ultra-rapide de nombres premiers JS/Node. Utilise le Tir Direct (Wheel Factorization) et l'Asynchrone Multithread pour pulvériser les limites V8.",
     "main": "index.js",
     "scripts": {
