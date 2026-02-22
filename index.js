@@ -137,6 +137,108 @@ function getPrimesV4(limit, segmentSize = 2000000) {
 
     const finalPrimes = [...BASE_PRIMES];
 
+    const wheel_gaps = new Int32Array(baseLen);
+    for (let i = 0; i < baseLen - 1; i++) wheel_gaps[i] = baseSurvivors[i + 1] - baseSurvivors[i];
+    wheel_gaps[baseLen - 1] = baseWidth + baseSurvivors[0] - baseSurvivors[baseLen - 1];
+
+    // Traitement Segments par Segments
+    for (let low = 0; low <= limit; low += segmentSize) {
+        let high = low + segmentSize - 1;
+        if (high > limit) high = limit;
+
+        const S = high - low + 1;
+        const isPrimeSeg = new Uint8Array(S);
+        isPrimeSeg.fill(1); // 1 = potentiel premier
+
+        if (low === 0) {
+            isPrimeSeg[0] = 0;
+            isPrimeSeg[1] = 0;
+        }
+
+        // Le Tir Direct : segmenté
+        const snipersLen = sniperPrimes.length;
+        for (let i = 0; i < snipersLen; i++) {
+            const p = sniperPrimes[i];
+
+            // Calculer l'intervalle des "survivants" (candidats) nécessaires pour atteindre [low, high]
+            const minSurvivor = Math.max(Math.ceil(low / p), p);
+            const maxSurvivor = Math.floor(high / p);
+
+            if (minSurvivor > maxSurvivor) continue;
+
+            const minCycle = Math.floor(minSurvivor / baseWidth) * baseWidth;
+            const rem = minSurvivor - minCycle;
+
+            let w = 0;
+            while (w < baseLen && baseSurvivors[w] < rem) w++;
+
+            let first_survivor;
+            if (w === baseLen) {
+                first_survivor = minCycle + baseWidth + baseSurvivors[0];
+                w = 0;
+            } else {
+                first_survivor = minCycle + baseSurvivors[w];
+            }
+
+            let currentImpact = first_survivor * p - low;
+            const endImpact = high - low;
+            while (currentImpact <= endImpact) {
+                isPrimeSeg[currentImpact] = 0; // Bim! Tir dans la fenêtre
+                currentImpact += p * wheel_gaps[w];
+                w++;
+                if (w === baseLen) w = 0;
+            }
+        }
+
+        // Récolte
+        const startCycleSeg = Math.floor(low / baseWidth) * baseWidth;
+        for (let cycle = startCycleSeg; cycle <= high; cycle += baseWidth) {
+            for (let k = 0; k < baseLen; k++) {
+                const c = cycle + baseSurvivors[k];
+                if (c >= low && c <= high) {
+                    if (c > 11 && isPrimeSeg[c - low]) {
+                        finalPrimes.push(c);
+                    }
+                }
+            }
+        }
+    }
+
+    return finalPrimes.filter(x => x <= limit);
+}
+
+/**
+ * MOTEUR V4 (Direct Hit) : L'Artillerie Lourde Originale
+ * C'est l'implémentation algorithmique "pure" du Sniper. 
+ * Au lieu de parcourir les écarts de proche en proche (wheel gaps), 
+ * ce moteur calcule mathématiquement chaque cible (p * survivor) pour tirer dessus.
+ * Ce concept est plus élégant et demande moins d'instructions de préparation, 
+ * mais les processeurs modernes l'exécutent environ 15% plus lentement 
+ * qu'un parcours par addition continue (V4 standard).
+ * Conservé pour sa valeur académique et la pureté du concept originel.
+ */
+function getPrimesV4_Direct(limit, segmentSize = 2000000) {
+    if (limit < 2) return [];
+
+    const BASE_PRIMES = [2, 3, 5, 7, 11];
+    const baseWidth = 2310;
+    const baseSurvivors = [];
+    for (let i = 1; i <= baseWidth; i++) {
+        let isSurvivor = true;
+        for (let p of BASE_PRIMES) {
+            if (i % p === 0) { isSurvivor = false; break; }
+        }
+        if (isSurvivor) baseSurvivors.push(i);
+    }
+    const baseLen = baseSurvivors.length;
+
+    // Calcul des snipers de base (petits premiers)
+    const maxP = Math.floor(Math.sqrt(limit));
+    const smallPrimes = getPrimesV3(Math.max(maxP, 11)); // On garantit jusqu'à 11 minimum
+    const sniperPrimes = smallPrimes.filter(p => p > 11);
+
+    const finalPrimes = [...BASE_PRIMES];
+
     // Traitement Segments par Segments
     for (let low = 0; low <= limit; low += segmentSize) {
         let high = low + segmentSize - 1;
@@ -315,5 +417,6 @@ module.exports = {
     getPrimesV2,
     getPrimesV3,
     getPrimesV4,
+    getPrimesV4_Direct, // L'implémentation originale "Sniper"
     getPrimesMulti
 };
