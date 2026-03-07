@@ -114,7 +114,7 @@ function runSieveBatch(sieveSize, timeLimitSeconds) {
     } while (performance.now() < timeFinish);
 
     const dur = (performance.now() - timeStart) / NOW_UNITS_PER_SECOND;
-    console.log(`helron-sniper;${nrOfPasses};${dur};1;algorithm=base,faithful=no,bits=1`);
+    console.log(`helron-sniper;${nrOfPasses};${dur};1;algorithm=other,faithful=no,bits=1`);
 }
 
 if (!new PrimeSniperGodMode(config.sieveSize).runSieve().validatePrimeCount()) {
