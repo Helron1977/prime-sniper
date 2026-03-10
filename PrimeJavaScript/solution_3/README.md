@@ -7,13 +7,13 @@
 
 ## Description
 
-Hyper-optimized sieve implementation using:
+Optimized sieve implementation using:
 - **Wheel Factorization** (2, 3, 5, 7) via Fast Pattern Copy.
 - **Binary Doubling Buffer Fill** for ultra-fast initialization.
 - **Localized Scope** (Hoisting) for V8 register optimization.
 - **Loop Unrolling x16** to maximize the execution pipeline.
 
-The main script is **PrimeJavaScript_extreme_sieve.js**, which implements a "Super-Wheel" covering primes 3-13 and an ultra-unrolled sieving loop.
+The main script is **PrimeJavaScript_extreme_sieve.js**, which implements a "Super-Wheel" covering primes 3-13 and an unrolled sieving loop.
 
 To run:
 ```bash

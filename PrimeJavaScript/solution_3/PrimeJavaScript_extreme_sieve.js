@@ -9,13 +9,12 @@ const LIMIT_BITS = SIEVE_SIZE >>> 1;
 // Period = 3 * 5 * 7 * 11 * 13 * 17 = 255,255 bits
 // To be word-aligned, we need 255,255 * 32 bits, but that's too big.
 // Instead, we use a 255,255 bit wheel and handle the bit-shift for the second half.
-// Wait, 255,255 is NOT a multiple of 32. 
-// However, if we make the wheel 255,255 * 32 bits = 8,168,160 bits, it's too large.
+// 255,255 is not a multiple of 32. 
+// but, if we make the wheel 255,255 * 32 bits = 8,168,160 bits, it's too large.
 // Let's stick to a word-aligned wheel for Primes 3, 5, 7, 11, 13.
 // Period (3,5,7,11,13) = 15,015. 
 // 15,015 words (15,015 * 32 bits) is a perfect word-aligned wheel for (3,5,7,11,13).
 // 15,015 * 32 = 480,480 bits. This is almost the entire sieve (500,000 bits)!
-// This is PERFECT.
 const SW_WORDS = 15015;
 const GLOBAL_SW = new Int32Array(SW_WORDS);
 
@@ -45,7 +44,7 @@ class PrimeSieve {
         const limit = this.limitBits;
         const q = this.q;
 
-        // 1. FAST INIT (Super-Wheel 3-13)
+        // 1. FAST INIT (Wheel 3-13)
         // One .set() covers 480,480 bits out of 500,000!
         arr.set(GLOBAL_SW.subarray(0, Math.min(SW_WORDS, len)));
         if (len > SW_WORDS) {
